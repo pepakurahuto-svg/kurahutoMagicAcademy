@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>キャラ保存テスト</title>
+</head>
+<body>
+  <h1>キャラ保存テスト</h1>
+
+  <button id="loginBtn">Googleでログイン</button>
+
+  <div id="userInfo"></div>
+
+  <input id="charName" placeholder="キャラ名を入力">
+  <button id="saveBtn">保存</button>
+
+  <p id="savedName"></p>
+
+  <!-- Firebase SDK（旧版 v8系） -->
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+
+  <script>
+    // ★ここに Firebase の設定を貼る
+  const firebaseConfig = {
+    apiKey: "AIzaSyC1KURGkhvMwdsBxx7hqDs6OkZmZwlLo48",
+    authDomain: "kurahutomagicacademy.firebaseapp.com",
+    projectId: "kurahutomagicacademy",
+    storageBucket: "kurahutomagicacademy.firebasestorage.app",
+    messagingSenderId: "523355656329",
+    appId: "1:523355656329:web:6f4d6574a2aae799b6f658"
+  };
+
+    // Firebase 初期化
+    firebase.initializeApp(firebaseConfig);
+
+    const auth = firebase.auth();
+    const db = firebase.firestore();
+
+    // ログイン
+    document.getElementById("loginBtn").onclick = async () => {
+      const provider = new firebase.auth.GoogleAuthProvider();
+      const result = await auth.signInWithPopup(provider);
+      document.getElementById("userInfo").innerText =
+        "ログイン中: " + result.user.email;
+    };
+
+    // キャラ名保存
+    document.getElementById("saveBtn").onclick = async () => {
+      const user = auth.currentUser;
+      if (!user) {
+        alert("ログインしてください");
+        return;
+      }
+
+      const name = document.getElementById("charName").value;
+
+      await db.collection("characters").doc(user.uid).set({
+        name: name
+      });
+
+      document.getElementById("savedName").innerText =
+        "保存されたキャラ名: " + name;
+    };
+  </script>
+</body>
+</html>
