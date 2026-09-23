@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>クラフト魔法学院 - ホーム</title>
+  <style>
+    #staminaArea {
+      border: 1px solid #888;
+      padding: 10px;
+      margin-bottom: 10px;
+      width: 300px;
+    }
+    .staminaBar {
+      height: 20px;
+      background-color: #4caf50;
+      transition: width 0.5s;
+    }
+    .full {
+      color: #4CAF50; /* 緑 */
+      font-weight: bold;
+    }
+    #createStaminaBar {
+      background-color: #2196F3; /* 青 */
+    }
+
+    #battleStaminaBar {
+      background-color: #f44336; /* 赤 */
+    }
+    #championsArea {
+      display: flex;
+      overflow-x: auto;   /* 横スクロール維持 */
+      gap: 16px;          /* カード間の余白を少し広げる */
+      padding: 10px;      /* 内側に余白 */
+      white-space: nowrap;
+    }
+
+    .champCard {
+      flex: 0 0 auto;     /* 横スクロール用 */
+      width: 300px;       /* 情報量に合わせて少し広げる */
+      border: 2px solid #ddd; /* 枠線を太めに */
+      border-radius: 10px;    /* 角丸でカード感UP */
+      padding: 12px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.15); /* 影で立体感 */
+      background: var(--attr-color); /* ← JSから渡す色 */
+    }
+
+    .champCard h3 {
+      margin-top: 0;
+      color: #333;
+    }
+
+    .champCard h4 {
+      margin-bottom: 4px;
+      color: #555;
+      border-bottom: 1px solid #ccc;
+      padding-bottom: 2px;
+    }
+
+    .myCharCard {
+      flex: 0 0 auto;
+      width: 300px;
+      background: #f2f2f2; /* 薄いグレー */
+      border: 2px solid #ddd;
+      border-radius: 10px;
+      padding: 12px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+    }
+
+    .myCharCard h3 {
+      margin-top: 0;
+      color: #333;
+    }
+
+    .myCharCard h4 {
+      margin-bottom: 4px;
+      color: #555;
+      border-bottom: 1px solid #ccc;
+      padding-bottom: 2px;
+    }
+
+    #charactersArea {
+      display: flex;
+      overflow-x: auto;
+      gap: 16px;
+      padding: 10px;
+      white-space: nowrap;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ログイン情報（右上） -->
+  <div id="userInfo" style="position: absolute; top: 10px; right: 10px; text-align: right;">
+    <div id="playerName"></div>
+    <div>ログイン中：<span id="userEmail"></span></div>
+  </div>
+
+  <h1>クラフト魔法学院</h1>
+  <p>ようこそ、プレイヤーさん！</p>
+
+  <!-- 🔹 スタミナ表示 -->
+  <div id="staminaArea">
+    <h3>スタミナ</h3>
+
+    <!-- キャラ作成スタミナ -->
+    <h4>生徒入学スタミナ</h4>
+    <div><span id="createStaminaText"></span></div>
+    <div class="staminaBar" id="createStaminaBar"></div>
+    <p id="nextCreateRecoveryText"></p>
+
+    <!-- バトルスタミナ -->
+    <h4>バトルスタミナ</h4>
+    <div><span id="battleStaminaText"></span></div>
+    <div class="staminaBar" id="battleStaminaBar"></div>
+    <p id="nextBattleRecoveryText"></p>
+  </div>
+
+  <button id="reloadBtn">リロード</button><br>
+  
+  <!-- チャンピオン表示 -->
+  <h2>最優秀生徒一覧</h2>
+  <div id="championsArea"></div>
+
+  <h2>あなたの生徒一覧</h2>
+  <div id="charactersArea"></div>
+
+  <div id="pagingArea">
+    <button id="prevPage">前のページ</button>
+    <span id="pageInfo"></span>
+    <button id="nextPage">次のページ</button>
+  </div>
+
+  <p id="status"></p>
+  <button onclick="location.href='character_create.html'">生徒入学（作成）</button><br>
+  <!-- ★ バトル説明文 -->
+  <p id="battleDescription">
+    バトルを開始するには、まず自分の生徒を選択し、<br>
+    対戦したい相手を選んでください。
+  </p>
+  <!-- ★ 対戦相手選択コンボボックス -->
+  <label for="enemySelect">対戦相手：</label>
+  <select id="enemySelect"></select>
+  <button id="battleBtn">バトル開始</button><br>
+  <button id="character_delete">生徒卒業（削除）</button><br>
+  <button id="helpBtn">ヘルプ</button>
+<div id="modalOverlay" onclick="closeHelpModal()">
+  <div id="modalContent" onclick="event.stopPropagation();"></div>
+</div><br>
+  <button onclick="logout()">ログアウト</button><br>
+
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+  <script src="firebase-config.js"></script>
+  <script src="attributes.js"></script>
+  <script src="helpmodal/modal.js"></script>
+
+  <script>
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const db = firebase.firestore();
+
+    let currentUserId = null;
+    let characters = [];
+    let currentPage = 1;
+    const pageSize = 4;
+
+    let createStamina = 0;
+    let battleStamina = 0;
+    let lastCreateRecovery = 0;
+    let lastBattleRecovery = 0;
+    const maxStamina = 10;
+
+    // -------------------------
+    // ログイン情報表示
+    // -------------------------
+    auth.onAuthStateChanged(async user => {
+      if (!user) {
+        location.href = "index.html";
+        return;
+      }else{
+        currentUserId = user.uid;
+      }
+
+      document.getElementById("userEmail").innerText = user.email;
+      const playerDoc = await db.collection("players").doc(currentUserId).get();
+
+      if (!playerDoc.exists) {
+        location.href = "player_create.html";
+        return;
+      }
+
+      const data = playerDoc.data();
+      document.getElementById("playerName").innerText = data.name + " さん";
+
+      // スタミナ情報取得
+      createStamina = data.create_stamina;
+      battleStamina = data.battle_stamina;
+      lastCreateRecovery = data.last_create_recovery.toMillis();
+      lastBattleRecovery = data.last_battle_recovery.toMillis();
+
+      updateStaminaDisplay();
+
+      // キャラ一覧取得
+      const snap = await db.collection("characters")
+        .where("playerId", "==", currentUserId)
+        .orderBy("characterId", "asc")
+        .get();
+
+      characters = snap.docs.map(doc => doc.data());
+      renderPage();
+      loadEnemySelect(); // コンボボックスに選択肢を入れる
+
+      // 🔹 スタミナ表示を定期更新（リロードなし）
+      setInterval(updateStaminaDisplay, 1000);
+    });
+
+    // -------------------------
+    // スタミナ表示更新
+    // -------------------------
+    function updateStaminaDisplay() {
+      const now = Date.now();
+
+      // --- キャラ作成スタミナ回復 ---
+      const diffCreateHours = Math.floor((now - lastCreateRecovery) / (1000 * 60 * 60));
+      if (diffCreateHours > 0 && createStamina < maxStamina) {
+        createStamina = Math.min(maxStamina, createStamina + diffCreateHours);
+        // 回復できる回数（スタミナ上限を超えない）
+        const recoverCount = Math.min(diffCreateHours, maxStamina - createStamina);
+
+        // スタミナ回復
+        createStamina += recoverCount;
+
+        // lastCreateRecovery を「回復した分だけ」進める
+        lastCreateRecovery += recoverCount * (1000 * 60 * 60);
+      }
+
+      // --- バトルスタミナ回復 ---
+      const diffBattleHours = Math.floor((now - lastBattleRecovery) / (1000 * 60 * 60));
+      if (diffBattleHours > 0 && battleStamina < maxStamina) {
+        // 回復できる回数（スタミナ上限を超えない）
+        const recoverCount = Math.min(diffBattleHours, maxStamina - battleStamina);
+
+        // スタミナ回復
+        battleStamina += recoverCount;
+
+        // lastBattleRecovery を「回復した分だけ」進める
+        lastBattleRecovery += recoverCount * (1000 * 60 * 60);
+      }
+
+      // --- 次回回復までの残り時間（個別） ---
+      const nextCreateRecovery = lastCreateRecovery + 1000 * 60 * 60;
+      const nextBattleRecovery = lastBattleRecovery + 1000 * 60 * 60;
+
+      const remainingCreate = createStamina >= maxStamina
+        ? "満タン"
+        : `${Math.max(0, Math.floor((nextCreateRecovery - now) / (1000 * 60)))} 分`;
+
+      const remainingBattle = battleStamina >= maxStamina
+        ? "満タン"
+        : `${Math.max(0, Math.floor((nextBattleRecovery - now) / (1000 * 60)))} 分`;
+
+      // --- 表示更新 ---
+      document.getElementById("createStaminaText").innerText = `${createStamina}/${maxStamina}`;
+      document.getElementById("battleStaminaText").innerText = `${battleStamina}/${maxStamina}`;
+
+      document.getElementById("createStaminaBar").style.width = `${(createStamina / maxStamina) * 100}%`;
+      document.getElementById("battleStaminaBar").style.width = `${(battleStamina / maxStamina) * 100}%`;
+
+      document.getElementById("nextCreateRecoveryText").innerText = `入学スタミナ回復まで：${remainingCreate}`;
+      document.getElementById("nextBattleRecoveryText").innerText = `バトルスタミナ回復まで：${remainingBattle}`;
+
+      // ★変更：満タン時だけテキスト色を変える
+      const createText = document.getElementById("nextCreateRecoveryText");
+      const battleText = document.getElementById("nextBattleRecoveryText");
+
+      if (createStamina >= maxStamina) {
+        createText.classList.add("full");   // ★追加
+      } else {
+        createText.classList.remove("full"); // ★追加
+      }
+
+      if (battleStamina >= maxStamina) {
+        battleText.classList.add("full");   // ★追加
+      } else {
+        battleText.classList.remove("full"); // ★追加
+      }
+    }
+
+    // -------------------------
+    // ページ描画（カードUI版）
+    // -------------------------
+    function renderPage() {
+      const start = (currentPage - 1) * pageSize;
+      const end = start + pageSize;
+      const pageCharacters = characters.slice(start, end);
+
+      const area = document.getElementById("charactersArea");
+      area.innerHTML = "";
+
+      pageCharacters.forEach(ch => {
+        const div = document.createElement("div");
+        const createdAtLocal = new Date(ch.createdAt).toLocaleString();
+        div.className = "myCharCard";
+
+        div.innerHTML = `
+          <input type="checkbox" name="charSelect" value="${ch.characterId}">
+          <h3>${ch.name}</h3>
+          <p>基礎魔力量：${ch.baseDice}</p>
+          <h4>属性 ／ レベル ／ 発動抵抗 ／ 最大威力 </h4>
+          <ul> 
+            ${Object.keys(ch.events).map(i => `
+              <li>
+                ${MAGIC_ATTRIBUTES[i]} ／ ${ch.events[i].dice} ／ ${ch.events[i].critical} ／ ${ch.events[i].maxAchieve}
+              </li>
+            `).join("")}
+          </ul>
+          <p>入学日時：${createdAtLocal}</p>
+          <p>入学Ver：${ch.createdVersion}</p>
+        `;
+        area.appendChild(div);
+      });
+
+      const totalPages = Math.ceil(characters.length / pageSize);
+      document.getElementById("pageInfo").innerText = `${currentPage} / ${totalPages}`;
+    }
+
+    // ページング
+    document.getElementById("prevPage").onclick = () => {
+      if (currentPage > 1) {
+        currentPage--;
+        renderPage();
+      }
+    };
+    document.getElementById("nextPage").onclick = () => {
+      const totalPages = Math.ceil(characters.length / pageSize);
+      if (currentPage < totalPages) {
+        currentPage++;
+        renderPage();
+      }
+    };
+
+    // -------------------------
+    // バトル開始
+    // -------------------------
+    document.getElementById("battleBtn").onclick = () => {
+      const selected = document.querySelector('input[name="charSelect"]:checked');
+      if (!selected) {
+        alert("自分の生徒を選択してください");
+        return;
+      }
+
+      const enemyAttrId = document.getElementById("enemySelect").value;
+
+      sessionStorage.setItem("selectedCharId", selected.value);
+      sessionStorage.setItem("enemyAttrId", enemyAttrId); // ★追加：対戦相手の属性ID
+
+      location.href = "battle.html";
+    };
+
+    // -------------------------
+    // チャンピオン表示
+    // -------------------------
+    async function loadChampions() {
+      const area = document.getElementById("championsArea");
+
+      // ★ キャラ情報を取得
+      async function loadCharacterInfo(charId) {
+        const charSnap = await db.collection("characters")
+          .doc(String(charId))
+          .get();
+
+        return charSnap.exists ? charSnap.data() : null;
+      }
+
+      // ★ プレイヤー名を取得
+      async function loadPlayerName(playerId) {
+        const playerSnap = await db.collection("players")
+          .doc(playerId)
+          .get();
+
+        return playerSnap.exists ? playerSnap.data().name : "不明なプレイヤー";
+      }
+      // チャンピオンが自分のキャラならハイライト表示
+      function highlightCreator(name, playerId) {
+        if (playerId === currentUserId) {
+          return `<strong style="color:red; font-weight:bold;">${name}</strong>`;
+        }
+        return name;
+      }
+
+      for (const attrId of Object.keys(MAGIC_ATTRIBUTES)) {
+        const attrName = MAGIC_ATTRIBUTES[attrId];
+
+        // 勝ち抜きチャンピオン
+        const champSnap = await db.collection("champions").doc(attrId).get();
+        let champHtml = "";
+        let champChar = null;
+
+        if (champSnap.exists) {
+          const data = champSnap.data();
+          champChar = await loadCharacterInfo(data.championId);
+          // ★ 属性ごとの critical を取得
+          const critical = champChar.events && champChar.events[attrId]
+            ? champChar.events[attrId].critical
+            : "不明";
+
+          // ★ 属性ごとの dice を取得
+          const dice = champChar.events && champChar.events[attrId]
+            ? champChar.events[attrId].dice
+            : "不明";
+            
+          // ★ 属性ごとの maxAchieve を取得
+          const maxAchieve = champChar.events && champChar.events[attrId]
+            ? champChar.events[attrId].maxAchieve
+            : "不明";
+
+          if (champChar) {
+            const creatorName = await loadPlayerName(champChar.playerId);
+            const creatorDisplay = highlightCreator(creatorName, champChar.playerId);
+
+            champHtml = `
+              <p>
+                <strong>${MAGIC_ATTRIBUTE_CHAMPION[attrId]}(勝ち抜き)</strong><br>
+                生徒名：${champChar.name}<br>
+                担当教授：${creatorDisplay}<br>
+                基礎魔力量：${champChar.baseDice}<br>
+                レベル：${dice}<br>
+                発動抵抗：${critical}<br>
+                連勝数：${data.winStreak}<br>
+                最大威力：${maxAchieve}
+              </p>
+            `;
+          } else {
+            champHtml = `<p>勝ち抜き最優秀生徒：生徒情報が見つかりません</p>`;
+          }
+        } else {
+          champHtml = `<p>勝ち抜き最優秀生徒：未設定</p>`;
+        }
+
+        // 最大魔法威力チャンピオン
+        const maxSnap = await db.collection("maxAchieveChampions").doc(attrId).get();
+        let maxHtml = "";
+        let maxChar = null;
+
+        if (maxSnap.exists) {
+          const data = maxSnap.data();
+          const maxChar = await loadCharacterInfo(data.championId);
+          // ★ 属性ごとの critical を取得
+          const critical = maxChar.events && maxChar.events[attrId]
+            ? maxChar.events[attrId].critical
+            : "不明";
+
+          // ★ 属性ごとの dice を取得
+          const dice = maxChar.events && maxChar.events[attrId]
+            ? maxChar.events[attrId].dice
+            : "不明";
+
+          if (maxChar) {
+            const creatorName = await loadPlayerName(maxChar.playerId);
+            const creatorDisplay = highlightCreator(creatorName, maxChar.playerId);
+
+            maxHtml = `
+              <p>
+                <strong>${MAGIC_ATTRIBUTE_MAXDAMAGE[attrId]}(最大威力)</strong><br>
+                生徒名：${maxChar.name}<br>
+                担当教授：${creatorDisplay}<br>
+                基礎魔力量：${maxChar.baseDice}<br>
+                レベル：${dice}<br>
+                発動抵抗：${critical}<br>
+                最大威力：${data.maxAchieve}
+              </p>
+            `;
+          } else {
+            maxHtml = `<p>最大威力最優秀生徒：生徒情報が見つかりません</p>`;
+          }
+        } else {
+          maxHtml = `<p>最大威力最優秀生徒：未設定</p>`;
+        }
+
+        // まとめて表示
+        const div = document.createElement("div");
+        div.className = "champCard";
+
+        // ★ 属性カラーを適用
+        div.style.setProperty("--attr-color", MAGIC_ATTRIBUTE_COLORS[attrId]);
+
+        div.innerHTML = `
+          <h3>属性：${attrName}</h3>
+          ${champHtml}
+          ${maxHtml}
+        `;
+        area.appendChild(div);
+      }
+    }
+    // -------------------------
+    // 属性チャンピオン選択肢をバトル相手コンボボックスに追加
+    // -------------------------
+    function loadEnemySelect() {
+      const select = document.getElementById("enemySelect");
+      select.innerHTML = ""; // 初期化
+
+      for (const attrId of Object.keys(MAGIC_ATTRIBUTE_CHAMPION)) {
+        const option = document.createElement("option");
+        option.value = attrId;
+        option.textContent = MAGIC_ATTRIBUTE_CHAMPION[attrId];
+        select.appendChild(option);
+      }
+    }
+    // -------------------------
+    // キャラクター削除
+    // -------------------------
+    document.getElementById("character_delete").onclick = async () => {
+      const selectedList = document.querySelectorAll('input[name="charSelect"]:checked');
+
+      if (selectedList.length === 0) {
+        alert("卒業する（削除）生徒を選択してください");
+        return;
+      }
+
+      if (selectedList.length > 1) {
+        alert("卒業する生徒は同時に1体のみ選択可能です。1体だけ選択してください。");
+        return;
+      }
+
+      // ★ ここだけ修正：数値化する
+      const charId = Number(selectedList[0].value);
+
+      // ★ 勝ち抜きチャンピオン判定
+      let isChampion = false;
+
+      for (const attrId of Object.keys(MAGIC_ATTRIBUTES)) {
+        const snap = await db.collection("champions").doc(attrId).get();
+        if (snap.exists && Number(snap.data().championId) === charId) {
+          isChampion = true;
+        }
+      }
+
+      // ★ 最大威力チャンピオン判定
+      for (const attrId of Object.keys(MAGIC_ATTRIBUTES)) {
+        const snap = await db.collection("maxAchieveChampions").doc(attrId).get();
+        if (snap.exists && Number(snap.data().championId) === charId) {
+          isChampion = true;
+        }
+      }
+
+      if (isChampion) {
+        alert("この生徒は覇者もくしは王のため卒業できません");
+        return;
+      }
+
+      const ok = confirm("生徒を卒業（削除）させてもよろしいですか？");
+      if (!ok) return;
+
+      await db.collection("characters").doc(String(charId)).delete();//Stringで渡さないとエラー
+      alert("生徒が卒業しました");
+      location.reload();
+    };
+
+    // ページ読み込み時に実行
+    window.onload = () => {
+      loadChampions();
+    };
+
+    //リロード
+    document.getElementById("reloadBtn").onclick = () => {
+      location.reload();
+    };
+
+    // ログアウト
+    function logout() {
+      auth.signOut().then(() => location.href = "index.html");
+    }
+
+    //help表示
+    document.getElementById("helpBtn").onclick = openHelpModal;
+  </script>
+</body>
+</html>
