@@ -28,11 +28,11 @@
     <li>9 → 8：75</li>
     <li>8 → 7：100</li>
     <li>7 → 6：150</li>
-    <li>6 → 5：200</li>
+    <li>6 → 5：220</li>
     <li>5 → 4：300</li>
     <li>4 → 3：400</li>
     <li>3 → 2：600</li>
-    <li>2 → 1：800</li>
+    <li>2 → 1：850</li>
   </ul>
 
   <h2>基礎魔力量</h2>
@@ -93,7 +93,34 @@
       3: { dice: 0, critical: 10 , maxAchieve: 0 },
       4: { dice: 0, critical: 10 , maxAchieve: 0 }
     };
+    // -------------------------
+    // コストテーブル（作成画面と同じ）
+    // -------------------------
+    const criticalCostTable = {
+        10: 50,
+        9: 75,
+        8: 100,
+        7: 150,
+        6: 220,
+        5: 300,
+        4: 400,
+        3: 600,
+        2: 850,
+        1: 1200
+    };
 
+    const criticalRefundTable = {
+        9: 50,
+        8: 75,
+        7: 100,
+        6: 150,
+        5: 220,
+        4: 300,
+        3: 400,
+        2: 600,
+        1: 850,
+        0: 1200 // 0→1 は本来禁止推奨だが一応記述
+    };
     // -------------------------
     // プレイヤー情報読み込み
     // -------------------------
@@ -105,6 +132,8 @@
 
       //自分のプレイヤーデータセット
       playerRef = db.collection("players").doc(user.uid);
+      //画面セット
+      updateUI();
     });
 
     // -------------------------
@@ -138,6 +167,32 @@
       for (let i = 1; i <= 4; i++) {
         document.getElementById(`dice${i}`).innerText = events[i].dice;
         document.getElementById(`critical${i}`).innerText = events[i].critical;
+      }
+      // ボタン制御（追加）
+      // 基礎魔力量
+      const basePlusBtn = document.getElementById("baseDicePlus");
+      const baseMinusBtn = document.getElementById("baseDiceMinus");
+
+      basePlusBtn.disabled = exp < 36;     // 経験値不足なら +1 禁止
+      baseMinusBtn.disabled = baseDice <= 4; // 初期値より下げられない
+
+      // 属性
+      for (let i = 1; i <= 4; i++) {
+        const dicePlusBtn = document.getElementById(`dicePlus${i}`);
+        const diceMinusBtn = document.getElementById(`diceMinus${i}`);
+        const criticalPlusBtn = document.getElementById(`criticalPlus${i}`);
+        const criticalMinusBtn = document.getElementById(`criticalMinus${i}`);
+
+        // dice
+        dicePlusBtn.disabled = exp < 10;           // 経験値不足なら +1 禁止
+        diceMinusBtn.disabled = events[i].dice <= 0; // 0 より下げられない
+
+        // critical
+        const c = events[i].critical;
+        const cost = criticalCostTable[c];
+
+        criticalMinusBtn.disabled = exp < cost;     // 経験値不足なら -1 禁止
+        criticalPlusBtn.disabled = c >= 10;         // 初期値より上げられない
       }
     }
 
@@ -184,22 +239,7 @@
       // critical -1（段階的にコスト増加）
       document.getElementById(`criticalMinus${i}`).onclick = () => {
         const c = events[i].critical;
-
-        // 段階的コスト
-        const costTable = {
-          10: 50,
-          9: 75,
-          8: 100,
-          7: 150,
-          6: 200,
-          5: 300,
-          4: 400,
-          3: 600,
-          2: 800,
-          1: 1000
-        };
-
-        const cost = costTable[c];
+        const cost = criticalCostTable[c];
 
         if (c > 0 && exp >= cost) {
           events[i].critical--;
@@ -211,22 +251,7 @@
       // critical +1（段階的に返却経験値）
       document.getElementById(`criticalPlus${i}`).onclick = () => {
         const c = events[i].critical;
-
-        // 返却経験値テーブル（期待値ベース）
-        const refundTable = {
-          9: 50,
-          8: 50,
-          7: 75,
-          6: 100,
-          5: 150,
-          4: 200,
-          3: 300,
-          2: 400,
-          1: 600,
-          0: 800 // 0→1 は本来禁止推奨だが一応記述
-        };
-
-        const refund = refundTable[c];
+        const refund = criticalRefundTable[c];
 
         // 初期値より増やせない（critical は 10 が上限）
         if (c < 10) {
