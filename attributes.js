@@ -32,3 +32,15 @@ const MAGIC_ATTRIBUTE_MAXDAMAGE = {
   3: "風壊王", // 風
   4: "土壊王"  // 土
 };
+
+// シナリオ
+const SCENARIO_NAME = {
+  1: "力試しミニトーナメント"
+};
+
+// シナリオ1キャラ
+const SCENARIO1_CHARA = {
+  1: "37", //ミナト
+  2: "38", //ユリエ
+  3: "39" //カイ
+};

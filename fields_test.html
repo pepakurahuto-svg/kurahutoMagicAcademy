@@ -2,13 +2,27 @@
 <html>
 <head>
   <meta charset="UTF-8">
-  <title>クラフト魔法学院 - ホーム</title>
+  <title>フィールドテスト</title>
   <style>
-    #staminaArea {
-      border: 1px solid #888;
+    #staminaAndFieldArea {
       padding: 10px;
       margin-bottom: 10px;
-      width: 600px;
+      width: 1200px;
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+    }
+    #staminaArea {
+      border: 1px solid #888;
+      width: 48%; /* 横に2つ並べるための幅 */
+      padding: 10px;
+      margin-bottom: 10px;
+    }
+    #fieldArea {
+      border: 1px solid #888;
+      width: 48%; /* 横に2つ並べるための幅 */
+      padding: 10px;
+      margin-bottom: 10px;
     }
     .staminaBar {
       height: 20px;
@@ -104,6 +118,7 @@
   <script src="firebase-config.js"></script>
   <script src="attributes.js"></script>
   <script src="helpmodal/modal.js"></script>
+  <script src="fields.js"></script>
 
   <!-- ログイン情報（右上） -->
   <div id="userInfo" style="position: absolute; top: 10px; right: 10px; text-align: right;">
@@ -115,20 +130,30 @@
   <p>ようこそ、プレイヤーさん！</p>
 
   <!-- 🔹 スタミナ表示 -->
-  <div id="staminaArea">
-    <div class="staminaRow">
-      <!-- バトルスタミナ -->
-      <div class="staminaBox">
-        <h4>スタミナ</h4>
-        <div><span id="battleStaminaText"></span></div>
-        <div class="staminaBar" id="battleStaminaBar"></div>
-        <p id="nextBattleRecoveryText"></p>
+  <div id="staminaAndFieldArea">
+    <div id="staminaArea">
+      <div class="staminaRow">
+        <!-- バトルスタミナ -->
+        <div class="staminaBox">
+          <h4>スタミナ</h4>
+          <div><span id="battleStaminaText"></span></div>
+          <div class="staminaBar" id="battleStaminaBar"></div>
+          <p id="nextBattleRecoveryText"></p>
+        </div>
+        <!-- 🔥 プレイヤー経験値表示（新規追加） -->
+        <div class="playerExpBox">
+          <h4>指導実績</h4>
+          <div><span id="playerExpText"></span></div>
+        </div>
       </div>
-      <!-- 🔥 プレイヤー経験値表示（新規追加） -->
-      <div class="playerExpBox">
-        <h4>指導実績</h4>
-        <div><span id="playerExpText"></span></div>
-      </div>
+    </div>
+    <!-- 🔹 学院付与表示 -->
+    <div id="fieldArea">
+      <h4>現在の学院付与</h4>
+      <p>生徒全員の能力に一時的に以下の補正がかかります。</p>
+      <div><span id="fieldsNowText"></span></div><br>
+      <h4>今後の学院付与</h4>
+      <div><span id="fieldsFutureText"></span></div>
     </div>
   </div>
 
@@ -225,6 +250,7 @@
       renderPage();
       loadEnemySelect(); // コンボボックスに選択肢を入れる
       loadScenarioSelect(); // コンボボックスに選択肢を入れる
+      loadFieldDisplay(); //field情報表示
 
       // 🔹 スタミナ表示を定期更新（リロードなし）
       setInterval(updateStaminaDisplay, 1000);

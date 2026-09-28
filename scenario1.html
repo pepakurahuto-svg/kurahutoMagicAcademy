@@ -7,6 +7,7 @@
     body { font-family: sans-serif; line-height: 1.6; }
     .scene { margin-bottom: 24px; }
     .dialog { margin-left: 1em; }
+    .hidden { display: none; }
     button { margin: 6px 4px; }
   </style>
 </head>
@@ -25,7 +26,7 @@
     </p>
     <p class="dialog">
       先生「今日は肩慣らしだよ。気楽にやってみよう。<br>
-      4人と順番に模擬戦をしてもらうからね。」
+      3人と順番に模擬戦をしてもらうからね。」
     </p>
     <button id="next1">次へ</button>
   </div>
@@ -37,11 +38,9 @@
       ミナト「やっほー！<br>
       せっかくだし、軽く手合わせしよ！」
     </p>
-    <p>
-      明るくて調子に乗りやすいタイプ。火属性の小さな魔法をポンポン撃ってくるが、
-      たまに自分に当たりそうになって慌てることがある。
+    <!-- ★ 説明文1 -->
+    <p id="Description1">
     </p>
-    <strong>火属性の戦闘となります。</strong>
     <button id="battle1">バトル開始</button>
   </div>
 
@@ -60,7 +59,7 @@
     <p class="dialog">
       ミナト「おっと、勝っちゃった！<br>
       でも気にしないでよ、まだ慣れてないだけだって。<br>
-      もう一回やってみる？」
+      今度もう一回やろうね！」
     </p>
     <button id="next2_fromLose">次へ</button>
   </div>
@@ -71,11 +70,9 @@
     <p class="dialog">
       ユリエ「こんにちは。先生に頼まれて、みんなの実力チェックをしているの。」
     </p>
-    <p>
-      真面目で丁寧な先輩。水属性の基礎魔法を正確に撃ってくるが、本気ではなく、
-      力を図ってきている。
+    <!-- ★ 説明文2 -->
+    <p id="Description2">
     </p>
-    <strong>水属性の戦闘となります。</strong>
     <button id="battle2">バトル開始</button>
   </div>
 
@@ -105,11 +102,9 @@
     <p class="dialog">
       カイ「先生に言われたから参加したけど……まぁやるか。」
     </p>
-    <p>
-      ひょうひょうとして掴みどころがない同級生。風属性の変則魔法で翻弄してくる。
-      集中力にムラが多い。
+    <!-- ★ 説明文3 -->
+    <p id="Description3">
     </p>
-    <strong>風属性の戦闘となります。</strong>
     <button id="battle3">バトル開始</button>
   </div>
 
@@ -180,6 +175,11 @@
 
     let myAchieve = null;
     let enemyAchieve = null;
+    
+    let scenarioId = null;
+    let battleId = null;
+    let scenarioWinFlag = null;
+    const attribute = Math.floor(Math.random() * 4) + 1;//属性決定
     // -------------------------
     // 情報読み込み
     // -------------------------
@@ -192,18 +192,176 @@
       //自分のプレイヤーデータセット
       playerRef = db.collection("players").doc(user.uid);
 
-      sessionStorage.setItem("battleId", battleId);
-        // battleId 1,2,3 はスタミナ消費なし
-        if ([1, 2, 3].includes(battleId)) {
-        // 何もしない
-        } else {
-            const ok = await consumeStamina(playerRef,2);
-            if (!ok) {
-                location.href = "player_gome.html";
-                return;
-            }
-        }
+      scenarioId = sessionStorage.getItem("scenarioId");
+      battleId = sessionStorage.getItem("battleId");
+      scenarioWinFlag = sessionStorage.getItem("scenarioWinFlag");
+
+      switch (Number(battleId)) {
+        case 0:
+          document.getElementById("scene1").classList.remove("hidden");
+          break;
+        case 1:
+          if (scenarioWinFlag === "true") {
+            document.getElementById("scene3_win").classList.remove("hidden");
+          }else{
+            document.getElementById("scene3_lose").classList.remove("hidden");
+          }
+          break;
+        case 2:
+          if (scenarioWinFlag === "true") {
+            document.getElementById("scene5_win").classList.remove("hidden");
+          }else{
+            document.getElementById("scene5_lose").classList.remove("hidden");
+          }
+          break;
+        case 3:
+          if (scenarioWinFlag === "true") {
+            document.getElementById("scene7_win").classList.remove("hidden");
+            const myId = sessionStorage.getItem("selectedCharId");
+            const myRef = db.collection("characters").doc(myId);
+            await myRef.update({
+              ["scenario.1.clearFlag"]: true
+            });
+          }else{
+            document.getElementById("scene7_lose").classList.remove("hidden");
+          }
+          break;
+        default:
+          break;
+      }
+      // battleId 1,2,3 はスタミナ消費なし
+      if ([1, 2, 3].includes(Number(battleId))) {
+      // 何もしない
+        //alert("スタミナ消費なし");
+      } else {
+          const ok = await consumeStamina(playerRef,2);
+          if (!ok) {
+              //alert("スタミナ消費");
+              location.href = "player_home.html";
+              return;
+          }
+      }
     });
+    // -------------------------
+    // シーン1
+    // -------------------------
+    document.getElementById("next1").onclick = () => {
+      document.getElementById("scene1").classList.add("hidden");
+      document.getElementById("scene2").classList.remove("hidden");
+    };
+    // -------------------------
+    // シーン2
+    // -------------------------
+    document.getElementById("battle1").onclick = () => {
+      sessionStorage.setItem("enemyId", SCENARIO1_CHARA[1]);//ミナト
+      sessionStorage.setItem("enemyAttrId", attribute);//属性バトル
+      sessionStorage.setItem("battleId", 1);//1戦目
+      location.href = "scenario_battle.html";
+    };
+    // -------------------------
+    // シーン3win
+    // -------------------------
+    document.getElementById("next2").onclick = () => {
+      document.getElementById("scene3_win").classList.add("hidden");
+      document.getElementById("scene4").classList.remove("hidden");
+    };
+    // -------------------------
+    // シーン3lose
+    // -------------------------
+    document.getElementById("next2_fromLose").onclick = () => {
+      document.getElementById("scene3_lose").classList.add("hidden");
+      document.getElementById("scene8_lose").classList.remove("hidden");
+    };
+    // -------------------------
+    // シーン4
+    // -------------------------
+    document.getElementById("battle2").onclick = () => {
+      sessionStorage.setItem("enemyId", SCENARIO1_CHARA[2]);//ユリエ
+      sessionStorage.setItem("enemyAttrId", attribute);//属性バトル
+      sessionStorage.setItem("battleId", 2);//2戦目
+      location.href = "scenario_battle.html";
+    };
+    // -------------------------
+    // シーン5win
+    // -------------------------
+    document.getElementById("next3").onclick = () => {
+      document.getElementById("scene5_win").classList.add("hidden");
+      document.getElementById("scene6").classList.remove("hidden");
+    };
+    // -------------------------
+    // シーン5lsoe
+    // -------------------------
+    document.getElementById("next3_fromLose").onclick = () => {
+      document.getElementById("scene5_lose").classList.add("hidden");
+      document.getElementById("scene8_lose").classList.remove("hidden");
+    };
+    // -------------------------
+    // シーン6
+    // -------------------------
+    document.getElementById("battle3").onclick = () => {
+      sessionStorage.setItem("enemyId", SCENARIO1_CHARA[3]);//カイ
+      sessionStorage.setItem("enemyAttrId", attribute);//属性バトル
+      sessionStorage.setItem("battleId", 3);//3戦目
+      location.href = "scenario_battle.html";
+    };
+    // -------------------------
+    // シーン7win
+    // -------------------------
+    document.getElementById("next4").onclick = () => {
+      document.getElementById("scene7_win").classList.add("hidden");
+      document.getElementById("scene8_win").classList.remove("hidden");
+    };
+    // -------------------------
+    // シーン7lsoe
+    // -------------------------
+    document.getElementById("next4_fromLose").onclick = () => {
+      document.getElementById("scene7_lose").classList.add("hidden");
+      document.getElementById("scene8_lose").classList.remove("hidden");
+    };
+    // -------------------------
+    // シーン8win
+    // -------------------------
+    document.getElementById("backHomeWin").onclick = () => {
+      sessionStorage.setItem("enemyId", 1);//初心者君
+      sessionStorage.setItem("enemyAttrId", 1);//火属性バトル
+      sessionStorage.setItem("battleId", 0);
+      sessionStorage.setItem("scenarioId", scenarioId);
+      location.href = "player_home.html";
+    };
+    // -------------------------
+    // シーン8lose
+    // -------------------------
+    document.getElementById("backHomeLose").onclick = () => {
+      sessionStorage.setItem("enemyId", 1);//初心者君
+      sessionStorage.setItem("enemyAttrId", 1);//火属性バトル
+      sessionStorage.setItem("battleId", 0);
+      sessionStorage.setItem("scenarioId", scenarioId);
+      location.href = "player_home.html";
+    };
+    // ページ読み込み時に実行
+    window.onload = () => {
+      const description1 = `
+        明るくて調子に乗りやすいタイプ。${MAGIC_ATTRIBUTES[attribute]}属性の小さな魔法をポンポン撃ってくるが、<br>
+        たまに自分に当たりそうになって慌てることがある。<br>
+        <strong>${MAGIC_ATTRIBUTES[attribute]}属性の戦闘となります。</strong>
+      `;
+      Description1.innerHTML = description1;
+
+      const description2 = `
+        真面目で丁寧な先輩。${MAGIC_ATTRIBUTES[attribute]}属性の基礎魔法を正確に撃ってくるが、本気ではなく、<br>
+        力を図ってきている。<br>
+        <strong>${MAGIC_ATTRIBUTES[attribute]}属性の戦闘となります。</strong>
+      `;
+      Description2.innerHTML = description2;
+
+      const description3 = `
+        ひょうひょうとして掴みどころがない同級生。${MAGIC_ATTRIBUTES[attribute]}属性の変則魔法で翻弄してくる。<br>
+        集中力にムラが多い。<br>
+        <strong>${MAGIC_ATTRIBUTES[attribute]}属性の戦闘となります。</strong>
+      `;
+      Description3.innerHTML = description3;
+
+    };
   </script>
 </body>
 </html>
